@@ -7,15 +7,18 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,21 +27,28 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.clicker21.ui.theme.Clicker21Theme
+import androidx.core.content.res.ResourcesCompat
+import com.example.compose.AppTheme
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlin.math.PI
@@ -59,7 +69,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun ClickerGame() {
 
-    var clicks by remember { mutableStateOf(0) }
+    var clicks by rememberSaveable { mutableStateOf(0) }
     val particles = remember { mutableStateListOf<Particle>() }
     var position by remember { mutableStateOf(Offset.Zero) }
     var boxPosition by remember  { mutableStateOf(Offset.Zero) }
@@ -67,11 +77,11 @@ fun ClickerGame() {
     var isPressed by remember { mutableStateOf(false) }
 
     val scale by animateFloatAsState(
-        targetValue = if(isPressed) 1.1f else 1f,
-        animationSpec = tween(delayMillis = 500)
+        targetValue = if(isPressed) 0.9f else 1f,
+        animationSpec = tween(delayMillis = 10)
     )
 
-    Clicker21Theme {
+    AppTheme {
         Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
             Box(modifier = Modifier
                 .padding(innerPadding)
@@ -83,29 +93,52 @@ fun ClickerGame() {
                     modifier = Modifier.align(Alignment.TopCenter))
 
                 Box(Modifier
-                    .size(100.dp)
-                    .graphicsLayer(scaleX = scale, scaleY = scale)
+                    .size(300.dp)
+
+                    .clip(CircleShape)
                     .align(Alignment.Center)
-                    .background(Color.Blue)
+                    //.background(Color.Blue)
                     .onGloballyPositioned {
                         boxPosition = Offset(it.positionInParent().x, it.positionInParent().y)
                     }
                     .pointerInput(Unit){
                         coroutineScope {
                             while (true){
-
                                 awaitPointerEventScope {
-                                    position = awaitFirstDown().position
+                                    val down = awaitFirstDown()
+                                    position = down.position
                                     clicks++
-                                    repeat(10){
+                                    isPressed = true
+                                    repeat(5){
                                         particles.add(Particle(position.x + boxPosition.x
                                             ,position.y + boxPosition.y))
+                                    }
+                                    down.consume()
+                                    val up = waitForUpOrCancellation()
+
+                                    if (up != null){
+                                        isPressed = false
                                     }
                                 }
                             }
                         }
                     }
-                )
+                ){
+                    Image(
+                        painter = painterResource(id = R.drawable.cthulhu_star),
+                        modifier = Modifier.fillMaxSize(),
+                        contentDescription = "Background",
+                        contentScale = ContentScale.Crop
+                    )
+                    Image(
+                        painter = painterResource(id = R.drawable.cthulhu),
+                        modifier = Modifier.fillMaxSize(0.7f)
+                            .align(Alignment.Center)
+                            .graphicsLayer(scaleX = scale, scaleY = scale),
+                        contentDescription = "Cthulhu",
+                        contentScale = ContentScale.Crop
+                    )
+                }
 
                 ParticleAnimation(particles)
             }
@@ -123,14 +156,26 @@ fun ParticleAnimation(particles: MutableList<Particle>){
             indalidate = !indalidate
         }
     }
-
+    val context = LocalContext.current
     Canvas(modifier = Modifier.fillMaxSize()) {
         indalidate.let {
             particles.forEach{ particle ->
-                drawIntoCanvas {
-                    drawCircle(Color.Red.copy(alpha = particle.alpha),
-                        radius = 8f,
-                        center = Offset(particle.x, particle.y))
+                drawIntoCanvas { canvas ->
+                    //drawCircle(Color.Red.copy(alpha = particle.alpha),
+                    //    radius = 8f,
+                    //    center = Offset(particle.x, particle.y))
+
+                    val paint = android.graphics.Paint().apply {
+                        color = android.graphics.Color.argb(particle.alpha, 0.38f,0.96f, 0.86f)
+                        textSize = 80f
+                        alpha = (particle.alpha * 255).toInt()
+                        typeface = ResourcesCompat.getFont(context, R.font.daedra)
+                    }
+                    canvas.nativeCanvas.drawText(
+                        particle.letter,
+                        particle.x, particle.y,
+                        paint
+                    )
                 }
             }
         }
@@ -140,7 +185,9 @@ fun ParticleAnimation(particles: MutableList<Particle>){
 
 data class Particle(var x:Float, var y:Float,
                     var alpha: Float = 1f,
-                    var rotation: Float = Random.nextFloat() * 360){
+                    var rotation: Float = Random.nextFloat() * 360,
+                    val letter: String = ('A'..'Z').random().toString()){
+
     private val angle = Random.nextFloat() * 2 * PI.toFloat()
     private val speed = Random.nextFloat() * 5 + 2
     private val speedX = speed * cos(angle)
@@ -150,9 +197,9 @@ data class Particle(var x:Float, var y:Float,
     fun update() : Boolean{
         x += speedX
         y += speedY
-        alpha -= 0.05f
+        alpha -= 0.02f
         rotation += 5
-        lifeTime -= 0.05f
+        lifeTime -= 0.02f
         return lifeTime > 0
     }
 }
