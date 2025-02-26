@@ -10,6 +10,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
@@ -34,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.draw
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
@@ -94,10 +96,9 @@ fun ClickerGame() {
 
                 Box(Modifier
                     .size(300.dp)
-
-                    .clip(CircleShape)
                     .align(Alignment.Center)
-                    //.background(Color.Blue)
+                    .clip(shape = CircleShape)
+                    .background(Color.Transparent)
                     .onGloballyPositioned {
                         boxPosition = Offset(it.positionInParent().x, it.positionInParent().y)
                     }
@@ -113,10 +114,11 @@ fun ClickerGame() {
                                         particles.add(Particle(position.x + boxPosition.x
                                             ,position.y + boxPosition.y))
                                     }
+
                                     down.consume()
                                     val up = waitForUpOrCancellation()
 
-                                    if (up != null){
+                                    if (up != null) {
                                         isPressed = false
                                     }
                                 }
@@ -172,7 +174,7 @@ fun ParticleAnimation(particles: MutableList<Particle>){
                         typeface = ResourcesCompat.getFont(context, R.font.daedra)
                     }
                     canvas.nativeCanvas.drawText(
-                        particle.letter,
+                        particle.letter, // Буква частицы
                         particle.x, particle.y,
                         paint
                     )
@@ -186,10 +188,9 @@ fun ParticleAnimation(particles: MutableList<Particle>){
 data class Particle(var x:Float, var y:Float,
                     var alpha: Float = 1f,
                     var rotation: Float = Random.nextFloat() * 360,
-                    val letter: String = ('A'..'Z').random().toString()){
-
+                    val letter: String =  ('A'..'Z').random().toString()){
     private val angle = Random.nextFloat() * 2 * PI.toFloat()
-    private val speed = Random.nextFloat() * 5 + 2
+    private val speed = Random.nextFloat() * 4 + 1
     private val speedX = speed * cos(angle)
     private val speedY = speed * sin(angle)
     private var lifeTime = 1f
