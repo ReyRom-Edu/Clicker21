@@ -28,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,7 +46,6 @@ import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.Typeface
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -71,7 +71,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun ClickerGame() {
 
-    var clicks by remember { mutableStateOf(0) }
+    var clicks by rememberSaveable { mutableStateOf(0) }
     val particles = remember { mutableStateListOf<Particle>() }
     var position by remember { mutableStateOf(Offset.Zero) }
     var boxPosition by remember  { mutableStateOf(Offset.Zero) }
@@ -129,7 +129,7 @@ fun ClickerGame() {
                     Image(
                         painter = painterResource(id = R.drawable.cthulhu_star),
                         modifier = Modifier.fillMaxSize(),
-                        contentDescription = "Background Image",
+                        contentDescription = "Background",
                         contentScale = ContentScale.Crop
                     )
                     Image(
@@ -168,8 +168,8 @@ fun ParticleAnimation(particles: MutableList<Particle>){
                     //    center = Offset(particle.x, particle.y))
 
                     val paint = android.graphics.Paint().apply {
-                        color = android.graphics.Color.argb(particle.alpha, 0.38f,0.96f,0.86f)
-                        textSize = 80f // Размер шрифта
+                        color = android.graphics.Color.argb(particle.alpha, 0.38f,0.96f, 0.86f)
+                        textSize = 80f
                         alpha = (particle.alpha * 255).toInt()
                         typeface = ResourcesCompat.getFont(context, R.font.daedra)
                     }
