@@ -15,13 +15,26 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -37,6 +50,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -55,6 +69,8 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.random.Random
+import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.runBlocking
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -67,9 +83,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun ClickerGame() {
-
-    var clicks by rememberSaveable { mutableStateOf(0) }
+fun ClickerGame(viewModel: GameViewModel = viewModel()) {
     val particles = remember { mutableStateListOf<Particle>() }
     var position by remember { mutableStateOf(Offset.Zero) }
     var boxPosition by remember  { mutableStateOf(Offset.Zero) }
@@ -81,6 +95,14 @@ fun ClickerGame() {
         animationSpec = tween(delayMillis = 10)
     )
 
+    LaunchedEffect(Unit) {
+        while (true){
+            delay(1000L)
+            viewModel.clicks += viewModel.clicksPerSecond
+        }
+    }
+
+
     AppTheme {
         Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
             Box(modifier = Modifier
@@ -88,7 +110,7 @@ fun ClickerGame() {
                 .fillMaxSize()
             )
             {
-                Text("Натапано: $clicks",
+                Text("Натапано: ${viewModel.clicks}",
                     fontSize = 30.sp,
                     modifier = Modifier.align(Alignment.TopCenter))
 
@@ -107,7 +129,7 @@ fun ClickerGame() {
                                 awaitPointerEventScope {
                                     val down = awaitFirstDown()
                                     position = down.position
-                                    clicks++
+                                    viewModel.clicks++
                                     isPressed = true
                                     repeat(5){
                                         particles.add(Particle(position.x + boxPosition.x
@@ -141,69 +163,67 @@ fun ClickerGame() {
                 }
 
                 ParticleAnimation(particles)
+                BottomSheet(viewModel)
             }
         }
     }
+    DisposableEffect(Unit) {
+        onDispose {
+            runBlocking {
+                viewModel.saveData()
+            }
+        }
+    }
+
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun BottomSheet(viewModel: GameViewModel){
+    var isSheetOpen by remember { mutableStateOf(false) }
+
+    if (isSheetOpen){
+        ModalBottomSheet(
+            onDismissRequest = { isSheetOpen = false },
+            sheetState = rememberModalBottomSheetState(),
+            modifier = Modifier
+                .fillMaxSize()
+                .navigationBarsPadding()
+        ) {
+            Column (Modifier.fillMaxSize().navigationBarsPadding()) {
+                UpgradeView(viewModel)
+            }
+        }
+    }
+
+
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter){
+        Button(onClick = {isSheetOpen = true}) {
+            Text("Меню")
+        }
+    }
+}
+
 
 @Composable
-fun ParticleAnimation(particles: MutableList<Particle>){
-    var indalidate by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        while (true){
-            delay(16L)
-            particles.removeAll{ !it.update() }
-            indalidate = !indalidate
-        }
-    }
-    val context = LocalContext.current
-    Canvas(modifier = Modifier.fillMaxSize()) {
-        indalidate.let {
-            particles.forEach{ particle ->
-                drawIntoCanvas { canvas ->
-                    //drawCircle(Color.Red.copy(alpha = particle.alpha),
-                    //    radius = 8f,
-                    //    center = Offset(particle.x, particle.y))
-
-                    val paint = android.graphics.Paint().apply {
-                        color = android.graphics.Color.argb(particle.alpha, 0.38f,0.96f, 0.86f)
-                        textSize = 80f
-                        alpha = (particle.alpha * 255).toInt()
-                        typeface = ResourcesCompat.getFont(context, R.font.daedra)
-                    }
-                    canvas.nativeCanvas.drawText(
-                        particle.letter,
-                        particle.x, particle.y,
-                        paint
-                    )
-                }
-            }
-        }
+fun UpgradeView(viewModel: GameViewModel){
+    Column (modifier = Modifier.padding(10.dp)) {
+        Text("Улучшения:")
+        Spacer(Modifier.height(10.dp))
+        UpgradeButton("Автоклик ур.${viewModel.clicksPerSecond}",
+            Icons.Default.Refresh) {viewModel.upgradeAutoclick()}
     }
 }
-
-
-data class Particle(var x:Float, var y:Float,
-                    var alpha: Float = 1f,
-                    var rotation: Float = Random.nextFloat() * 360,
-                    val letter: String = ('A'..'Z').random().toString()){
-
-    private val angle = Random.nextFloat() * 2 * PI.toFloat()
-    private val speed = Random.nextFloat() * 5 + 2
-    private val speedX = speed * cos(angle)
-    private val speedY = speed * sin(angle)
-    private var lifeTime = 1f
-
-    fun update() : Boolean{
-        x += speedX
-        y += speedY
-        alpha -= 0.02f
-        rotation += 5
-        lifeTime -= 0.02f
-        return lifeTime > 0
+@Composable
+fun UpgradeButton(text: String, icon: ImageVector, onClick: () -> Unit){
+    Button(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth()
+    ){
+        Icon(icon, contentDescription = text)
+        Text(text)
     }
 }
-
 
 
 
