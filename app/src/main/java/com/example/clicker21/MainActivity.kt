@@ -1,5 +1,6 @@
 package com.example.clicker21
 
+import android.app.Application
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -14,8 +15,10 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,12 +26,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -47,6 +53,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
@@ -57,11 +64,15 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.res.ResourcesCompat
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
 import com.example.compose.AppTheme
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -99,6 +110,13 @@ fun ClickerGame(viewModel: GameViewModel = viewModel()) {
         while (true){
             delay(1000L)
             viewModel.clicks += viewModel.clicksPerSecond
+            if (viewModel.clicksPerSecond > 0){
+                val point = getRandomParticleInCircle(
+                    boxPosition.x + 150.dpf,
+                    boxPosition.y + 150.dpf,
+                    150.dpf)
+                particles.add(point)
+            }
         }
     }
 
@@ -110,9 +128,18 @@ fun ClickerGame(viewModel: GameViewModel = viewModel()) {
                 .fillMaxSize()
             )
             {
-                Text("Натапано: ${viewModel.clicks}",
-                    fontSize = 30.sp,
-                    modifier = Modifier.align(Alignment.TopCenter))
+                Box(
+                    Modifier
+                        .fillMaxWidth().height(100.dp)
+                        .background(MaterialTheme.colorScheme.primary)
+
+                ){
+                    Text("Сила культа: ${viewModel.clicks}",
+                        fontSize = 30.sp,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.align(Alignment.Center))
+                }
+
 
                 Box(Modifier
                     .size(300.dp)
@@ -167,15 +194,36 @@ fun ClickerGame(viewModel: GameViewModel = viewModel()) {
             }
         }
     }
-    DisposableEffect(Unit) {
-        onDispose {
-            runBlocking {
-                viewModel.saveData()
+    ApplicationLifecycleObserver { viewModel.saveData() }
+}
+
+@Composable
+fun ApplicationLifecycleObserver(onExit: ()->Unit){
+    val  lifecycleOwner = LocalLifecycleOwner.current
+
+    DisposableEffect(lifecycleOwner)
+    {
+        val observer = object : DefaultLifecycleObserver
+        {
+            override fun onStop(owner: LifecycleOwner) {
+                onExit()
+            }
+            override fun onDestroy(owner: LifecycleOwner) {
+                onExit()
+            }
+            override fun onPause(owner: LifecycleOwner) {
+                onExit()
             }
         }
-    }
 
+        lifecycleOwner.lifecycle.addObserver(observer)
+
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 }
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -186,6 +234,7 @@ fun BottomSheet(viewModel: GameViewModel){
         ModalBottomSheet(
             onDismissRequest = { isSheetOpen = false },
             sheetState = rememberModalBottomSheetState(),
+            shape = RectangleShape,
             modifier = Modifier
                 .fillMaxSize()
                 .navigationBarsPadding()
@@ -198,7 +247,10 @@ fun BottomSheet(viewModel: GameViewModel){
 
 
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter){
-        Button(onClick = {isSheetOpen = true}) {
+        Button(
+            onClick = {isSheetOpen = true},
+            shape = RectangleShape,
+            modifier = Modifier.fillMaxWidth().height(50.dp)) {
             Text("Меню")
         }
     }
@@ -207,21 +259,38 @@ fun BottomSheet(viewModel: GameViewModel){
 
 @Composable
 fun UpgradeView(viewModel: GameViewModel){
+    var invalidate by remember { mutableStateOf(false) }
     Column (modifier = Modifier.padding(10.dp)) {
         Text("Улучшения:")
         Spacer(Modifier.height(10.dp))
-        UpgradeButton("Автоклик ур.${viewModel.clicksPerSecond}",
-            Icons.Default.Refresh) {viewModel.upgradeAutoclick()}
+        invalidate.let {
+            viewModel.upgrades.forEach{
+                UpgradeButton(it.title, it.description){
+                    viewModel.upgrade(it)
+                    invalidate = !invalidate
+                }
+            }
+        }
     }
 }
 @Composable
-fun UpgradeButton(text: String, icon: ImageVector, onClick: () -> Unit){
+fun UpgradeButton(title: String, description: String, icon: ImageVector = Icons.Default.KeyboardArrowUp, onClick: () -> Unit){
     Button(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth().padding(4.dp)
     ){
-        Icon(icon, contentDescription = text)
-        Text(text)
+
+        Row (verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Start,
+            modifier = Modifier.fillMaxWidth()) {
+            Icon(icon, contentDescription = title)
+            Spacer(Modifier.width(10.dp))
+            Column {
+                Text(title)
+                Text(description)
+            }
+        }
+
     }
 }
 

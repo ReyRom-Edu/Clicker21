@@ -17,6 +17,7 @@ import kotlinx.coroutines.delay
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.math.sqrt
 import kotlin.random.Random
 
 @Composable
@@ -34,15 +35,12 @@ fun ParticleAnimation(particles: MutableList<Particle>){
         indalidate.let {
             particles.forEach{ particle ->
                 drawIntoCanvas { canvas ->
-                    //drawCircle(Color.Red.copy(alpha = particle.alpha),
-                    //    radius = 8f,
-                    //    center = Offset(particle.x, particle.y))
-
                     val paint = android.graphics.Paint().apply {
                         color = android.graphics.Color.argb(particle.alpha, 0.38f,0.96f, 0.86f)
                         textSize = 80f
-                        alpha = (particle.alpha * 255).toInt()
                         typeface = ResourcesCompat.getFont(context, R.font.daedra)
+                        setShadowLayer(10f,5f,5f,
+                            android.graphics.Color.argb(particle.alpha, 0f,0f, 0f))
                     }
                     canvas.nativeCanvas.drawText(
                         particle.letter,
@@ -59,9 +57,9 @@ fun ParticleAnimation(particles: MutableList<Particle>){
 data class Particle(var x:Float, var y:Float,
                     var alpha: Float = 1f,
                     var rotation: Float = Random.nextFloat() * 360,
+                    val angle: Float = Random.nextFloat() * 2 * PI.toFloat(),
                     val letter: String = ('A'..'Z').random().toString()){
 
-    private val angle = Random.nextFloat() * 2 * PI.toFloat()
     private val speed = Random.nextFloat() * 5 + 2
     private val speedX = speed * cos(angle)
     private val speedY = speed * sin(angle)
@@ -75,4 +73,15 @@ data class Particle(var x:Float, var y:Float,
         lifeTime -= 0.02f
         return lifeTime > 0
     }
+}
+
+
+fun getRandomParticleInCircle(centerX: Float, centerY: Float, radius: Float): Particle{
+    val theta = Random.nextFloat() * 2 * PI.toFloat()
+    val r = sqrt(Random.nextFloat()) * radius
+
+    val x = centerX + r * cos(theta)
+    val y = centerY + r * sin(theta)
+
+    return Particle(x,y, angle = theta)
 }
