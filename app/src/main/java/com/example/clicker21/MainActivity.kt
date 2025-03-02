@@ -21,9 +21,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
@@ -50,6 +53,7 @@ import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.DefaultLifecycleObserver
@@ -58,6 +62,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.compose.AppTheme
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import java.math.BigDecimal
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -74,8 +79,9 @@ fun ClickerGame(viewModel: GameViewModel = viewModel()) {
     val particles = remember { mutableStateListOf<Particle>() }
     var position by remember { mutableStateOf(Offset.Zero) }
     var boxPosition by remember  { mutableStateOf(Offset.Zero) }
-
+    var boxSize by remember  { mutableStateOf(IntSize.Zero) }
     var isPressed by remember { mutableStateOf(false) }
+    var showDialog by remember { mutableStateOf(true) }
 
     val scale by animateFloatAsState(
         targetValue = if(isPressed) 0.9f else 1f,
@@ -85,14 +91,24 @@ fun ClickerGame(viewModel: GameViewModel = viewModel()) {
         while (true){
             delay(1000L)
             viewModel.clicks += viewModel.clicksPerSecond
-            if(viewModel.clicksPerSecond > 0){
-                val point = getRandomParticleInCircle(boxPosition.x + 150.dpf, boxPosition.y + 150.dpf, 150.dpf)
+            if(viewModel.clicksPerSecond > BigDecimal(0) ){
+                val point = getRandomParticleInCircle(boxPosition.x + boxSize.width/2, boxPosition.y + boxSize.height/2 , boxSize.height/2f)
                 particles.add(point)
             }
         }
     }
-
-
+    if (showDialog) {
+        AlertDialog(
+            onDismissRequest = { showDialog = false },
+            title = { Text("Добро пожаловать обратно!") },
+            text = { Text("Вы заработали очков за время отсутствия.") },
+            confirmButton = {
+                Button(onClick = { showDialog = false }) {
+                    Text("OK")
+                }
+            }
+        )
+    }
     AppTheme {
         Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
             Box(modifier = Modifier
@@ -100,7 +116,7 @@ fun ClickerGame(viewModel: GameViewModel = viewModel()) {
                 .fillMaxSize()
             )
             {
-                Text("Натапано: ${viewModel.clicks}",
+                Text("Натапано: ${viewModel.clicks.formatNumber()}",
                     fontSize = 30.sp,
                     modifier = Modifier.align(Alignment.TopCenter))
 
@@ -112,6 +128,7 @@ fun ClickerGame(viewModel: GameViewModel = viewModel()) {
                     //.background(Color.Blue)
                     .onGloballyPositioned {
                         boxPosition = Offset(it.positionInParent().x, it.positionInParent().y)
+                        boxSize = it.size
                     }
                     .pointerInput(Unit){
                         coroutineScope {
@@ -210,8 +227,8 @@ fun BottomSheet(viewModel: GameViewModel){
 
 
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter){
-        Button(onClick = {isSheetOpen = true}) {
-            Text("Меню")
+        FloatingActionButton(onClick = {isSheetOpen = true}, modifier = Modifier.align(Alignment.BottomEnd).padding(10.dp)) {
+            Icon(Icons.Filled.Menu,"")
         }
     }
 }

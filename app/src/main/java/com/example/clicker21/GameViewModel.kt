@@ -11,6 +11,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.Polymorphic
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import java.math.BigDecimal
 import kotlin.math.pow
 
 class GameViewModel(app: Application): AndroidViewModel(app) {
@@ -25,9 +26,9 @@ class GameViewModel(app: Application): AndroidViewModel(app) {
                 upgrades.addAll(data)
             }
             else{
-                upgrades.add(AutoClickerUpgrade(0,100,1.7, 0))
-                upgrades.add(ClickMultiplierUpgrade(0,100,1.5, 1.0))
-                upgrades.add(OfflineEarningsUpgrade(0,100,1.2, 0))
+                upgrades.add(AutoClickerUpgrade(0, BigDecimal(100),1.7, BigDecimal(0)))
+                upgrades.add(ClickMultiplierUpgrade(0,BigDecimal(100),1.5, BigDecimal(1)) { u -> "Множитель кликов ур.$u.level - x${u.multiplier.formatNumber()}" })
+                upgrades.add(OfflineEarningsUpgrade(0,BigDecimal(100),1.2, BigDecimal(0)))
             }
 
             upgrades.map {
@@ -42,13 +43,13 @@ class GameViewModel(app: Application): AndroidViewModel(app) {
 
     val upgrades = mutableStateListOf<Upgrade>()
 
-    var clicks by mutableStateOf(0)
+    var clicks by mutableStateOf(BigDecimal(0))
 
-    var multiplier by mutableStateOf(0.0)
+    var multiplier by mutableStateOf(BigDecimal(0))
 
-    var clicksPerSecond by mutableStateOf(0)
+    var clicksPerSecond by mutableStateOf(BigDecimal(0))
 
-    var offlineCap by mutableStateOf(0)
+    var offlineCap by mutableStateOf(BigDecimal(0))
 
     fun saveData(){
         viewModelScope.launch {
@@ -65,15 +66,15 @@ class GameViewModel(app: Application): AndroidViewModel(app) {
 @Polymorphic
 sealed class Upgrade{
     abstract  var level: Int
-    abstract  var cost: Int
+    abstract  var cost: BigDecimal
     abstract  val growthFactor: Double
     abstract  val title: String
     open fun upgrade(){
         level++
         cost = calculateNextCost()
     }
-    fun calculateNextCost(): Int {
-        return (cost * (growthFactor.pow(level))).toInt()
+    fun calculateNextCost(): BigDecimal {
+        return (cost * BigDecimal(growthFactor.pow(level)))
     }
 }
 
@@ -81,16 +82,20 @@ sealed class Upgrade{
 @SerialName("ClickMultiplierUpgrade")
 class ClickMultiplierUpgrade(
     override var level: Int,
-    override var cost: Int,
+    @Serializable(with = BigDecimalSerializer::class)
+    override var cost: BigDecimal,
     override val growthFactor: Double,
-    var multiplier: Double,  // Увеличивает очки за клик
+    @Serializable(with = BigDecimalSerializer::class)
+    var multiplier: BigDecimal,  // Увеличивает очки за клик
+    @SerialName("-")
+    val description: (ClickMultiplierUpgrade) -> String
 ) : Upgrade() {
     override val title: String
-        get() = "Множитель кликов ур.$level - x$multiplier"
+        get() = description(this)
 
     override fun upgrade(){
         super.upgrade()
-        multiplier *= 1.2
+        multiplier *= BigDecimal(1.2)
     }
 }
 
@@ -98,16 +103,18 @@ class ClickMultiplierUpgrade(
 @SerialName("AutoClickerUpgrade")
 class AutoClickerUpgrade(
     override var level: Int,
-    override var cost: Int,
+    @Serializable(with = BigDecimalSerializer::class)
+    override var cost: BigDecimal,
     override val growthFactor: Double,
-    var clicksPerSecond: Int // Добавляет авто-клики
+    @Serializable(with = BigDecimalSerializer::class)
+    var clicksPerSecond: BigDecimal // Добавляет авто-клики
 ) : Upgrade(){
     override val title: String
-        get() = "Автоклик ур.$level - $clicksPerSecond к/с"
+        get() = "Автоклик ур.$level - ${clicksPerSecond.formatNumber()} к/с"
 
     override fun upgrade() {
         super.upgrade()
-        clicksPerSecond = (clicksPerSecond * 1.05).toInt() + 1
+        clicksPerSecond = clicksPerSecond * BigDecimal(1.05) + BigDecimal(1)
     }
 }
 
@@ -115,16 +122,18 @@ class AutoClickerUpgrade(
 @SerialName("OfflineEarningsUpgrade")
 class OfflineEarningsUpgrade(
     override var level: Int,
-    override var cost: Int,
+    @Serializable(with = BigDecimalSerializer::class)
+    override var cost: BigDecimal,
     override val growthFactor: Double,
-    var offlineCap: Int // Улучшает доход в оффлайне
+    @Serializable(with = BigDecimalSerializer::class)
+    var offlineCap: BigDecimal // Улучшает доход в оффлайне
 ) : Upgrade(){
     override val title: String
-        get() = "Лимит оффлайн дохода ур.$level - максимум $offlineCap"
+        get() = "Лимит оффлайн дохода ур.$level - максимум ${offlineCap.formatNumber()}"
 
     override fun upgrade() {
         super.upgrade()
-        offlineCap = (offlineCap * 1.2).toInt() + 10
+        offlineCap = offlineCap * BigDecimal(1.2) + BigDecimal(10)
     }
 }
 
