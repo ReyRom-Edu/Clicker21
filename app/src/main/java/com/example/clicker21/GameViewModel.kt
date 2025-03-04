@@ -8,13 +8,20 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.Polymorphic
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
+import java.math.BigDecimal
 import kotlin.math.pow
 
 class GameViewModel(app: Application): AndroidViewModel(app) {
+    var isDarkTheme by mutableStateOf(true)
+
     val storage: GameStorage = GameStorage(app)
     init{
         viewModelScope.launch{
@@ -26,30 +33,72 @@ class GameViewModel(app: Application): AndroidViewModel(app) {
                 upgrades.addAll(data)
             }
             else{
-                upgrades.add(ClickMultiplierUpgrade(0,100,1.5,"Безумие", 1.0))
-                upgrades.add(AutoclickUpgrade(0,100,1.5,"Последователи культа", 0))
-                upgrades.add(OfflineEarningsUpgrade(0,100,1.5,"Храм Древних", 0))
+                upgrades.add(ClickMultiplierUpgrade(
+                    0,
+                    BigDecimal(100),
+                    1.5,
+                    "Безумие",
+                    BigDecimal(1))
+                )
+                upgrades.add(AutoclickUpgrade(
+                    0,
+                    BigDecimal(100),
+                    1.5,
+                    "Последователи культа",
+                    BigDecimal(0))
+               )
+                upgrades.add(OfflineEarningsUpgrade(
+                    0,
+                    BigDecimal(100),
+                    1.5,
+                    "Храм Древних",
+                    BigDecimal(0))
+                )
             }
 
             upgrades.map {
                 when(it){
-                    is ClickMultiplierUpgrade -> multiplier = it.multiplier
-                    is AutoclickUpgrade -> clicksPerSecond = it.clicksPerSecond
-                    is OfflineEarningsUpgrade -> offlineCap = it.offlineCap
+                    is ClickMultiplierUpgrade -> {
+                        multiplier = it.multiplier
+                        it.descriptionBuilder = { u -> "Множитель клика ур.${u.level} - ${u.multiplier.formatNumber(2)}" }
+                    }
+                    is AutoclickUpgrade ->{
+                        clicksPerSecond = it.clicksPerSecond
+                        it.descriptionBuilder =  { u -> "Автоклик ур.${u.level} - ${u.clicksPerSecond.formatNumber()}" }
+                    }
+                    is OfflineEarningsUpgrade -> {
+                        offlineCap = it.offlineCap
+                        it.descriptionBuilder = { u -> "Офлайн доход ур.${u.level} - ${u.offlineCap.formatNumber()}" }
+                    }
                 }
             }
         }
     }
-    var clicks by mutableStateOf(0)
+    var clicks by mutableStateOf(BigDecimal(0))
 
-    var clicksPerSecond by mutableStateOf(0)
+    var clicksPerSecond by mutableStateOf(BigDecimal(0))
 
-    var multiplier by mutableStateOf(0.0)
+    var multiplier by mutableStateOf(BigDecimal(0.0))
 
-    var offlineCap by mutableStateOf(0)
+    var offlineCap by mutableStateOf(BigDecimal(0))
 
     val upgrades = mutableStateListOf<Upgrade>()
 
+    suspend fun calculateOfflineEarnings(): Deferred<BigDecimal>{
+        return viewModelScope.async {
+            val currentTime = System.currentTimeMillis()
+            val exitTime = storage.getExitTime()
+
+            val deltaSec = (currentTime - exitTime)/1000
+
+            var earnings = BigDecimal(0)
+            if (offlineCap > BigDecimal(0)){
+                earnings = (BigDecimal(deltaSec)*clicksPerSecond)
+            }
+
+            if(earnings > offlineCap) offlineCap else earnings
+        }
+    }
 
     fun upgrade(item: Upgrade){
         item.upgrade()
@@ -73,7 +122,7 @@ class GameViewModel(app: Application): AndroidViewModel(app) {
 @Polymorphic
 sealed class Upgrade{
     abstract var level: Int
-    abstract var cost: Int
+    abstract var cost: BigDecimal
     abstract val growthFactor: Double
     abstract val title: String
     abstract val description : String
@@ -82,8 +131,8 @@ sealed class Upgrade{
         level++
         cost = calculateNextCost()
     }
-    fun calculateNextCost(): Int{
-        return (cost * (growthFactor.pow(level))).toInt()
+    fun calculateNextCost(): BigDecimal{
+        return cost * BigDecimal(growthFactor.pow(level))
     }
 }
 
@@ -91,17 +140,22 @@ sealed class Upgrade{
 @SerialName("ClickMultiplierUpgrade")
 class ClickMultiplierUpgrade(
     override var level:Int,
-    override var cost: Int,
+    @Serializable(BigDecimalSerializer::class)
+    override var cost: BigDecimal,
     override val growthFactor: Double,
     override val title: String,
-    var multiplier: Double
+    @Serializable(BigDecimalSerializer::class)
+    var multiplier: BigDecimal
 ) : Upgrade(){
+    @Transient
+    var descriptionBuilder: (ClickMultiplierUpgrade) -> String = {u->""}
+
     override val description : String
-        get() = "Множитель кликов ур.%d - x%.2f".format(level, multiplier)
+        get() = descriptionBuilder(this)
 
     override fun upgrade() {
         super.upgrade()
-        multiplier *= 1.2
+        multiplier *= BigDecimal(1.2)
     }
 }
 
@@ -109,17 +163,22 @@ class ClickMultiplierUpgrade(
 @SerialName("AutoclickUpgrade")
 class AutoclickUpgrade(
     override var level:Int,
-    override var cost: Int,
+    @Serializable(BigDecimalSerializer::class)
+    override var cost: BigDecimal,
     override val growthFactor: Double,
     override val title: String,
-    var clicksPerSecond: Int
+    @Serializable(BigDecimalSerializer::class)
+    var clicksPerSecond: BigDecimal
 ) : Upgrade(){
+    @Transient
+    var descriptionBuilder: (AutoclickUpgrade) -> String = {u->""}
+
     override val description : String
-        get() = "Автоклик ур.$level - $clicksPerSecond к/с"
+        get() = descriptionBuilder(this)
 
     override fun upgrade() {
         super.upgrade()
-        clicksPerSecond = (clicksPerSecond * 1.05).toInt() + 1
+        clicksPerSecond = clicksPerSecond * BigDecimal(1.05) + BigDecimal(1)
     }
 }
 
@@ -127,16 +186,21 @@ class AutoclickUpgrade(
 @SerialName("OfflineEarningsUpgrade")
 class OfflineEarningsUpgrade(
     override var level:Int,
-    override var cost: Int,
+    @Serializable(BigDecimalSerializer::class)
+    override var cost: BigDecimal,
     override val growthFactor: Double,
     override val title: String,
-    var offlineCap: Int
+    @Serializable(BigDecimalSerializer::class)
+    var offlineCap: BigDecimal
 ) : Upgrade(){
+    @Transient
+    var descriptionBuilder: (OfflineEarningsUpgrade) -> String = {u->""}
+
     override val description : String
-        get() = "Лимит офлайн дохода ур.$level - максимум $offlineCap"
+        get() = descriptionBuilder(this)
 
     override fun upgrade() {
         super.upgrade()
-        offlineCap = (offlineCap * 1.2).toInt() + 10
+        offlineCap = offlineCap * BigDecimal(1.2) + BigDecimal(10)
     }
 }
