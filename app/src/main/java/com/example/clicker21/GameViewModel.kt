@@ -8,6 +8,9 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
@@ -19,7 +22,7 @@ import kotlinx.serialization.Transient
 import java.math.BigDecimal
 import kotlin.math.pow
 
-class GameViewModel(app: Application): AndroidViewModel(app) {
+class GameViewModel(val app: Application): AndroidViewModel(app) {
     var isDarkTheme by mutableStateOf(true)
 
     val storage: GameStorage = GameStorage(app)
@@ -114,8 +117,27 @@ class GameViewModel(app: Application): AndroidViewModel(app) {
             storage.saveScore(clicks)
             storage.saveUpgrages(upgrades)
             storage.saveExitTime()
+            scheduleOfflineEarningsCheck()
         }
     }
+
+    fun scheduleOfflineEarningsCheck() {
+        val workRequest = PeriodicWorkRequestBuilder<OfflineEarningsWorker>(
+            repeatInterval = 1, // Проверять раз в час
+            repeatIntervalTimeUnit = java.util.concurrent.TimeUnit.HOURS
+        ).build()
+
+        WorkManager.getInstance(app).enqueueUniquePeriodicWork(
+            "offlineEarningsWork",
+            ExistingPeriodicWorkPolicy.KEEP,
+            workRequest
+        )
+    }
+
+    fun cancelOfflineEarningsCheck() {
+        WorkManager.getInstance(app).cancelUniqueWork("offlineEarningsWork")
+    }
+
 }
 
 @Serializable

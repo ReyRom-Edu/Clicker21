@@ -94,6 +94,8 @@ import java.math.BigDecimal
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 0)
+        NotificationHelper.createNotificationChannel(this)
         enableEdgeToEdge()
         setContent {
             ClickerGame()
@@ -227,11 +229,11 @@ fun ClickerGame(viewModel: GameViewModel = viewModel()) {
             }
         }
     }
-    ApplicationLifecycleObserver { viewModel.saveData() }
+    ApplicationLifecycleObserver ({ viewModel.saveData() }, {viewModel.cancelOfflineEarningsCheck()})
 }
 
 @Composable
-fun ApplicationLifecycleObserver(onExit: ()->Unit){
+fun ApplicationLifecycleObserver(onExit: ()->Unit, onStart: ()->Unit){
     val  lifecycleOwner = LocalLifecycleOwner.current
 
     DisposableEffect(lifecycleOwner)
@@ -239,13 +241,26 @@ fun ApplicationLifecycleObserver(onExit: ()->Unit){
         val observer = object : DefaultLifecycleObserver
         {
             override fun onStop(owner: LifecycleOwner) {
+                super.onStop(owner)
                 onExit()
             }
             override fun onDestroy(owner: LifecycleOwner) {
+                super.onDestroy(owner)
                 onExit()
             }
             override fun onPause(owner: LifecycleOwner) {
+                super.onPause(owner)
                 onExit()
+            }
+
+            override fun onResume(owner: LifecycleOwner) {
+                super.onResume(owner)
+                onStart()
+            }
+
+            override fun onStart(owner: LifecycleOwner) {
+                super.onStart(owner)
+                onStart()
             }
         }
 
