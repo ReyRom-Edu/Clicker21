@@ -101,11 +101,14 @@ class GameViewModel(app: Application): AndroidViewModel(app) {
     }
 
     fun upgrade(item: Upgrade){
-        item.upgrade()
-        when(item){
-            is ClickMultiplierUpgrade -> multiplier = item.multiplier
-            is AutoclickUpgrade -> clicksPerSecond = item.clicksPerSecond
-            is OfflineEarningsUpgrade -> offlineCap = item.offlineCap
+        if (clicks > item.cost){
+            clicks -= item.cost
+            item.upgrade()
+            when(item){
+                is ClickMultiplierUpgrade -> multiplier = item.multiplier
+                is AutoclickUpgrade -> clicksPerSecond = item.clicksPerSecond
+                is OfflineEarningsUpgrade -> offlineCap = item.offlineCap
+            }
         }
     }
 

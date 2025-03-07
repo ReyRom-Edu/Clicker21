@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.magnifier
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -162,7 +163,8 @@ fun ClickerGame(viewModel: GameViewModel = viewModel()) {
             {
                 Box(
                     Modifier
-                        .fillMaxWidth().height(100.dp)
+                        .fillMaxWidth()
+                        .height(100.dp)
                         .background(MaterialTheme.colorScheme.primary)
 
                 ){
@@ -183,22 +185,26 @@ fun ClickerGame(viewModel: GameViewModel = viewModel()) {
                         boxPosition = Offset(it.positionInParent().x, it.positionInParent().y)
                         boxSize = it.size
                     }
-                    .pointerInput(Unit){
+                    .pointerInput(Unit) {
                         coroutineScope {
-                            while (true){
+                            while (true) {
                                 awaitPointerEventScope {
                                     val down = awaitFirstDown()
                                     position = down.position
                                     viewModel.clicks += viewModel.multiplier
                                     isPressed = true
-                                    repeat(5){
-                                        particles.add(Particle(position.x + boxPosition.x
-                                            ,position.y + boxPosition.y))
+                                    repeat(5) {
+                                        particles.add(
+                                            Particle(
+                                                position.x + boxPosition.x,
+                                                position.y + boxPosition.y
+                                            )
+                                        )
                                     }
                                     down.consume()
                                     val up = waitForUpOrCancellation()
 
-                                    if (up != null){
+                                    if (up != null) {
                                         isPressed = false
                                     }
                                 }
@@ -214,7 +220,8 @@ fun ClickerGame(viewModel: GameViewModel = viewModel()) {
                     )
                     Image(
                         painter = painterResource(id = R.drawable.cthulhu),
-                        modifier = Modifier.fillMaxSize(0.7f)
+                        modifier = Modifier
+                            .fillMaxSize(0.7f)
                             .align(Alignment.Center)
                             .graphicsLayer(scaleX = scale, scaleY = scale),
                         contentDescription = "Cthulhu",
@@ -275,7 +282,10 @@ fun BottomSheet(viewModel: GameViewModel){
                 .fillMaxSize()
                 .navigationBarsPadding()
         ) {
-            Column (Modifier.fillMaxSize().navigationBarsPadding()) {
+            Column (
+                Modifier
+                    .fillMaxSize()
+                    .navigationBarsPadding()) {
                 TabRow(
                     selectedTabIndex = selectedTabIndex
                 ) {
@@ -304,7 +314,9 @@ fun BottomSheet(viewModel: GameViewModel){
         Button(
             onClick = {isSheetOpen = true},
             shape = RectangleShape,
-            modifier = Modifier.fillMaxWidth().height(50.dp)) {
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp)) {
             Text("Меню")
         }
     }
@@ -315,13 +327,17 @@ fun SettingsView(viewModel: GameViewModel) {
     var volume by remember { mutableStateOf(0f) }
     Column {
         Row (verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().padding(20.dp)){
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp)){
             Text("Звук")
             Spacer(Modifier.width(15.dp))
             Slider(value = volume, onValueChange = {volume = it}, modifier = Modifier.fillMaxWidth())
         }
         Row (verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().padding(20.dp)){
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp)){
             Text("Темная тема")
             Spacer(Modifier.width(15.dp))
             Switch(checked = viewModel.isDarkTheme, onCheckedChange = {viewModel.isDarkTheme = !viewModel.isDarkTheme})
@@ -341,7 +357,7 @@ fun UpgradeView(viewModel: GameViewModel){
     Column (modifier = Modifier.padding(10.dp)) {
         invalidate.let {
             viewModel.upgrades.forEach{
-                UpgradeButton(it.title, it.description){
+                UpgradeButton(it.title, it.description, it.cost.formatNumber()){
                     viewModel.upgrade(it)
                     invalidate = !invalidate
                 }
@@ -350,23 +366,30 @@ fun UpgradeView(viewModel: GameViewModel){
     }
 }
 @Composable
-fun UpgradeButton(title: String, description: String, icon: ImageVector = Icons.Default.KeyboardArrowUp, onClick: () -> Unit){
+fun UpgradeButton(title: String, description: String, cost: String, icon: ImageVector = Icons.Default.KeyboardArrowUp, onClick: () -> Unit){
     Button(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth().padding(4.dp)
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(4.dp)
     ){
 
-        Row (verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Start,
-            modifier = Modifier.fillMaxWidth()) {
-            Icon(icon, contentDescription = title)
-            Spacer(Modifier.width(10.dp))
-            Column {
-                Text(title)
-                Text(description)
-            }
-        }
+        Box {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Start,
+                modifier = Modifier.fillMaxWidth().align(Alignment.CenterStart)
+            ) {
+                Icon(icon, contentDescription = title)
+                Spacer(Modifier.width(10.dp))
+                Column {
+                    Text(title)
+                    Text(description)
+                }
 
+            }
+            Text(cost, Modifier.align(Alignment.CenterEnd))
+        }
     }
 }
 
